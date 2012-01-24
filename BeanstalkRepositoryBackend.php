@@ -41,6 +41,16 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 					'element' => 'repository',
 				),
 			)),
+			'Release' => new ModelConfig('Release', array(
+				'properties' => array(
+					'id' => 'id',
+					'name' => 'name',
+				),
+				'backendConfig' => array(
+					'path' => 'releases',
+					'element' => 'release',
+				),
+			)),
 			'Account' => new ModelConfig('Account', array(
 				'properties' => array(
 					'id' => 'id',
@@ -89,14 +99,7 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 	}
 
 	function all($config) {
-		$url = $this->getUrl($config['path']);
-		$responseText = file_get_contents($url);
-		$response = json_decode($responseText, true);
-		$data = array();
-		foreach ($response as $item) {
-			$data[] = $item[$config['element']];
-		}
-		return $data;
+		return new BeanstalkCollection($this->getUrl($config['path']), $config['element']);
 	}
 
 	/**
