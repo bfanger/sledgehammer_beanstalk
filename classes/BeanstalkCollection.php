@@ -42,6 +42,14 @@ class BeanstalkCollection extends Collection {
 					}
 					break;
 
+				case 'commit':
+					if ($this->repository === null) {
+						$this->data = $this->client->getChangesets();
+					} else {
+						$this->data = $this->client->getChangesetsFor($this->repository);
+					}
+					break;
+
 				default:
 					throw new \Exception('Type: "'.$this->type.'" not supported');
 			}

@@ -37,6 +37,15 @@ class BeanstalkClient extends Object {
 		return $this->single($this->buildUrl('users/'.$id), 'user');
 	}
 
+	function getChangesets($options = array()) {
+		return $this->multiple($this->buildUrl('changesets', $options), 'revision_cache');
+	}
+
+	function getChangesetsFor($repository, $options = array()) {
+		$options['repository_id'] = $repository;
+		return $this->multiple($this->buildUrl('changesets/repository', $options), 'revision_cache');
+	}
+
 	/**
 	 * @param int|string $repository The id or name of the repository
 	 * @return array

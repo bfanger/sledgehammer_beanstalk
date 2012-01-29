@@ -41,6 +41,10 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 						'model' => 'Release',
 						'reference' => 'repository.id'
 					),
+					'commits' => array(
+						'model' => 'Commit',
+						'reference' => 'repository.id'
+					),
 				),
 				'backendConfig' => array(
 					'type' => 'repository',
@@ -59,6 +63,39 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 				),
 				'backendConfig' => array(
 					'type' => 'release',
+				),
+			)),
+			'Commit' =>  new ModelConfig('Commit', array(
+				'properties' => array(
+					'revision' => 'id',
+					"hash_id" => "hash",
+					"message" => "message",
+					"time" => "created",
+					"author" => 'author',
+					"email" => "email",
+					"changed_files" => 'files',
+					"changed_dirs" => 'folders',
+					"changed_properties"=> 'properties',
+					"too_large" => 'isTooLarge',
+				),
+				'id' => array('revision'),
+				'belongsTo' => array(
+					'repository' => array(
+						'model' => 'Repository',
+						'reference' => 'repository_id'
+					),
+					'account' => array(
+						'model' => 'Account',
+						'reference' => 'account_id'
+					),
+					'user' => array(
+						'model' => 'User',
+						'reference' => 'user_id'
+					),
+
+				),
+				'backendConfig' => array(
+					'type' => 'commit',
 				),
 			)),
 			'Account' => new ModelConfig('Account', array(
@@ -120,7 +157,7 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 	}
 
 	function all($config) {
-		if (in_array($config['type'], array('repository', 'release')) === false) {
+		if (in_array($config['type'], array('repository', 'release', 'commit')) === false) {
 			throw new InfoException('Unsupported config', $config);
 		}
 		return new BeanstalkCollection($this->client, $config['type']);
