@@ -84,19 +84,11 @@ class BeanstalkClient extends Object {
 //			notice('Incorrect response type (xml instead of json)', $url);
 			return array();
 		}
-		$response = json_decode($responseText, true);
-		$error = json_last_error();
-		if ($error !== JSON_ERROR_NONE) {
-
-			throw new InfoException(Json::translateJsonError($error), array(
-				'url' => (string) $url,
-				'response' => $responseText
-			));
-		}
-		return $response;
+		return Json::decode($responseText, true);
 	}
 
 	/**
+	 * Build a Beanstalk API url
 	 *
 	 * @param string $path
 	 * @param array $params
