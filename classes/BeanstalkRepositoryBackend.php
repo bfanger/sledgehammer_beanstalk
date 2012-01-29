@@ -1,23 +1,21 @@
 <?php
-/**
- * BeanstalkBackend
- */
 
 namespace SledgeHammer;
 
+/**
+ * BeanstalkBackend
+ */
 class BeanstalkRepositoryBackend extends RepositoryBackend {
 
 	public $identifier = 'beanstalk';
 
-	private $account;
-	private $user;
-	private $password;
+	/**
+	 * @var BeanstalkClient
+	 */
+	private $client;
 
 	function __construct($account, $user = null, $password = null) {
-		$this->account = $account;
-		$this->user = $user;
-		$this->password = $password;
-
+		$this->client = new BeanstalkClient($account, $user, $password);
 		$this->configs = array(
 			'Repository' => new ModelConfig('Repository', array(
 				'class' => false,
@@ -29,6 +27,8 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 					'vcs' => 'vcs',
 					'created_at' => 'created',
 					'last_commit_at' => 'lastCommit',
+					'branches' => 'branches',
+					'tags' => 'tags',
 				),
 				'belongsTo' => array(
 					'account' => array(
@@ -36,9 +36,14 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 						'reference' => 'account_id',
 					)
 				),
+				'hasMany' => array(
+					'releases' => array(
+						'model' => 'Release',
+						'reference' => 'repository.id'
+					),
+				),
 				'backendConfig' => array(
-					'path' => 'repositories',
-					'element' => 'repository',
+					'type' => 'repository',
 				),
 			)),
 			'Release' => new ModelConfig('Release', array(
@@ -46,9 +51,14 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 					'id' => 'id',
 					'name' => 'name',
 				),
+				'belongsTo' => array(
+					'repository' => array(
+						'model' => 'Repository',
+						'reference' => 'repository_id'
+					),
+				),
 				'backendConfig' => array(
-					'path' => 'releases',
-					'element' => 'release',
+					'type' => 'release',
 				),
 			)),
 			'Account' => new ModelConfig('Account', array(
@@ -64,8 +74,7 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 					)
 				),
 				'backendConfig' => array(
-					'path' => 'accounts',
-					'element' => 'account',
+					'type' => 'account',
 				),
 			)),
 			'User' => new ModelConfig('User', array(
@@ -84,38 +93,39 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 					)
 				),
 				'backendConfig' => array(
-					'path' => 'users',
-					'element' => 'user',
+					'type' => 'user',
 				),
 			))
 		);
 	}
 
 	function get($id, $config) {
-		$url = $this->getUrl($config['path'].'/'.rawurlencode($id));
-		$responseText = file_get_contents($url);
-		$response = json_decode($responseText, true);
-		return $response[$config['element']];
+		switch ($config['type']) {
+
+			case 'repository':
+				$repository = $this->client->getRepository($id);
+				$repository['branches'] = $this->client->getBranchesFor($id);
+				$repository['tags'] = $this->client->getTagsFor($id);
+				return $repository;
+
+			case 'account':
+				return $this->client->getAccount($id);
+
+			case 'user':
+				return $this->client->getUser($id);
+
+			default:
+				throw new InfoException('Unsupported config', $config);
+		}
 	}
 
 	function all($config) {
-		return new BeanstalkCollection($this->getUrl($config['path']), $config['element']);
+		if (in_array($config['type'], array('repository', 'release')) === false) {
+			throw new InfoException('Unsupported config', $config);
+		}
+		return new BeanstalkCollection($this->client, $config['type']);
 	}
 
-	/**
-	 *
-	 * @param string $path
-	 * @param array $params
-	 * @return \SledgeHammer\URL
-	 */
-	private function getUrl($path, $params = array()) {
-		$url = new URL('http://'.$this->account.'.beanstalkapp.com/api/'.$path.'.json');
-		$url->user = $this->user;
-		$url->pass = $this->password;
-		$url->query = $params;
-		return $url;
-//
-	}
 }
 
 ?>
