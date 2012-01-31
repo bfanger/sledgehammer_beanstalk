@@ -27,8 +27,8 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 					'vcs' => 'vcs',
 					'created_at' => 'created',
 					'last_commit_at' => 'lastCommit',
-					'branches' => 'branches',
-					'tags' => 'tags',
+//					'branches' => 'branches',
+//					'tags' => 'tags',
 				),
 				'belongsTo' => array(
 					'account' => array(
@@ -141,8 +141,8 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 
 			case 'repository':
 				$repository = $this->client->getRepository($id);
-				$repository['branches'] = $this->client->getBranchesFor($id);
-				$repository['tags'] = $this->client->getTagsFor($id);
+//				$repository['branches'] = $this->client->getBranchesFor($id);
+//				$repository['tags'] = $this->client->getTagsFor($id);
 				return $repository;
 
 			case 'account':

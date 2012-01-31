@@ -36,10 +36,10 @@ class BeanstalkCollection extends Collection {
 
 				case 'repository':
 					$this->data = $this->client->getRepositories();
-					foreach ($this->data as $index => $repository) {
-						$this->data[$index]['branches'] = $this->client->getBranchesFor($repository['id']);
-						$this->data[$index]['tags'] = $this->client->getTagsFor($repository['id']);
-					}
+//					foreach ($this->data as $index => $repository) {
+//						$this->data[$index]['branches'] = $this->client->getBranchesFor($repository['id']);
+//						$this->data[$index]['tags'] = $this->client->getTagsFor($repository['id']);
+//					}
 					break;
 
 				case 'commit':
