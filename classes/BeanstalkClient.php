@@ -104,7 +104,7 @@ class BeanstalkClient extends Object {
 	 * @return \SledgeHammer\URL
 	 */
 	private function buildUrl($path, $params = array()) {
-		$url = new URL('http://'.$this->account.'.beanstalkapp.com/api/'.$path.'.json');
+		$url = new URL('https://'.$this->account.'.beanstalkapp.com/api/'.$path.'.json');
 		$url->user = $this->user;
 		$url->pass = $this->password;
 		$url->query = $params;
