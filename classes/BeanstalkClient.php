@@ -41,12 +41,46 @@ class BeanstalkClient extends Object {
 		return $this->single($this->buildUrl('users/'.$id), 'user');
 	}
 
+	/**
+	 * Retrieve changesets from all repositories available to the logged in user.
+	 * @link http://api.beanstalkapp.com/changeset.html
+	 *
+	 * @param array $options  Optional options:
+	 *   page (integer) — page number for pagination.
+	 *   per_page (integer) — number of elements per page (default 15, maximum 30);
+	 *   order_field (string) — what column to use for ordering (default is time);
+	 *   order (string) — order direction. Should be either ASC or DESC (default is DESC).
+	 *   all - (bool) return an Iterator that will automaticly retrieve the next page.
+	 *
+	 * @return \Traversable
+	 */
 	function getChangesets($options = array()) {
+		if (array_value($options, 'all')) {
+			unset($options['all']);
+			return new BeanstalkPagedResult($this->buildUrl('changesets', $options), 'revision_cache');
+		}
 		return $this->multiple($this->buildUrl('changesets', $options), 'revision_cache');
 	}
 
+	/**
+	 * Retrieve changesets from a repository.
+	 * @link http://api.beanstalkapp.com/changeset.html
+	 *
+	 * @param array $options  Optional options:
+	 *   page (integer) — page number for pagination.
+	 *   per_page (integer) — number of elements per page (default 15, maximum 30);
+	 *   order_field (string) — what column to use for ordering (default is time);
+	 *   order (string) — order direction. Should be either ASC or DESC (default is DESC).
+	 *   all - (bool) return an Iterator that will automaticly retrieve the next page.
+	 *
+	 * @return \Traversable
+	 */
 	function getChangesetsFor($repository, $options = array()) {
 		$options['repository_id'] = $repository;
+		if (array_value($options, 'all')) {
+			unset($options['all']);
+			return new BeanstalkPagedResult($this->buildUrl('changesets/repository', $options), 'revision_cache');
+		}
 		return $this->multiple($this->buildUrl('changesets/repository', $options), 'revision_cache');
 	}
 
