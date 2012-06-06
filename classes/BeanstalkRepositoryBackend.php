@@ -1,9 +1,10 @@
 <?php
-
-namespace SledgeHammer;
-
 /**
  * BeanstalkBackend
+ */
+namespace Sledgehammer;
+/**
+ * @package Beanstalk
  */
 class BeanstalkRepositoryBackend extends RepositoryBackend {
 

@@ -2,9 +2,10 @@
 /**
  * BeanstalkCollection
  */
-
-namespace SledgeHammer;
-
+namespace Sledgehammer;
+/**
+ * @package Beanstalk
+ */
 class BeanstalkCollection extends Collection {
 
 	/**

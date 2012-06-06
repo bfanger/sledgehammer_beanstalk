@@ -1,9 +1,13 @@
 <?php
-
-namespace SledgeHammer;
-
 /**
  * BeanstalkClient
+ */
+namespace Sledgehammer;
+/**
+ * Client for the Beanstalk API
+ * @link http://api.beanstalkapp.com/
+ *
+ * @package Beanstalk
  */
 class BeanstalkClient extends Object {
 
