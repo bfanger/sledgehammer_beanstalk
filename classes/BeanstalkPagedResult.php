@@ -12,16 +12,20 @@ namespace Sledgehammer;
 class BeanstalkPagedResult extends Object implements \Iterator {
 
 	/**
-	 * URL of the paged API call.
-	 * @var URL
+	 * @var BeanstalkClient
 	 */
-	private $url;
+	private $client;
 
 	/**
-	 * The name of the wrapper element.
+	 * path of the API call.
 	 * @var string
 	 */
-	private $element;
+	private $path;
+
+	/**
+	 * @var array
+	 */
+	private $parameters;
 
 	/**
 	 * Active page.
@@ -30,31 +34,29 @@ class BeanstalkPagedResult extends Object implements \Iterator {
 	private $page = 1;
 
 	/**
-	 * Results per page (max 30)
-	 * @var int
-	 */
-	private $perPage = 30;
-
-	/**
 	 * Resultset of the API calls.
 	 * @var type
 	 */
 	private $results = array();
 
 	/**
-	 *
 	 * @var bool
 	 */
 	private $isLastPage = false;
 
 	/**
 	 * Constructor
-	 * @param URL $url URL of the paged API call.
-	 * @param string $element The name of the wrapper element.
+	 * @param BeanstalkClient $client
+	 * @param string $path
+	 * @param array $parameters
 	 */
-	function __construct($url, $element) {
-		$this->url = $url;
-		$this->element = $element;
+	function __construct($client, $path, $parameters = array()) {
+		$this->client = $client;
+		$this->path = $path;
+		$this->parameters = $parameters;
+		if (empty($this->parameters['per_page'])) {
+			$this->parameters['per_page'] = 30;
+		}
 	}
 
 	/**
@@ -70,7 +72,7 @@ class BeanstalkPagedResult extends Object implements \Iterator {
 	 * @return int
 	 */
 	function key() {
-		$base = ($this->page - 1) * $this->perPage;
+		$base = ($this->page - 1) * $this->parameters['per_page'];
 		$key = key($this->results[$this->page]);
 		if ($key !== null) {
 			return $base + $key;
@@ -85,8 +87,9 @@ class BeanstalkPagedResult extends Object implements \Iterator {
 		$next = next($this->results[$this->page]);
 		if ($next === false && key($this->results[$this->page]) === null && $this->isLastPage === false) { // End of page?
 			$this->page++;
-			$this->results[$this->page] = $this->fetchPage($this->page);
-			$this->isLastPage = (count($this->results[$this->page]) != $this->perPage); // Are there less records than the page
+			$this->parameters['page'] = $this->page;
+			$this->results[$this->page] = $this->client->get($this->path, $this->parameters);
+			$this->isLastPage = (count($this->results[$this->page]) != $this->parameters['per_page']); // Are there less records than the page
 		}
 	}
 
@@ -96,14 +99,15 @@ class BeanstalkPagedResult extends Object implements \Iterator {
 	 */
 	function rewind() {
 		if (count($this->results) === 0) {
-			$this->results[1] = $this->fetchPage(1);
+			$this->parameters['page'] = 1;
+			$this->results[1] = $this->client->get($this->path, $this->parameters);
 		} else {
 			foreach (array_keys($this->results) as $i) {
 				reset($this->results[$i]);
 			}
 		}
 		$this->page = 1;
-		$this->isLastPage = (count($this->results[1]) != $this->perPage); // Are there less records than the page
+		$this->isLastPage = (count($this->results[1]) != $this->parameters['per_page']); // Are there less records than the page
 	}
 
 	/**
@@ -112,30 +116,6 @@ class BeanstalkPagedResult extends Object implements \Iterator {
 	 */
 	function valid() {
 		return (key($this->results[$this->page]) !== null);
-	}
-
-	/**
-	 * Execute the API call for the given page and unpack the result.
-	 *
-	 * @param int $page
-	 * @return array Resultset
-	 */
-	private function fetchPage($page) {
-		$this->url->query['page'] = $page;
-		$this->url->query['per_page'] = $this->perPage;
-		$responseText = file_get_contents($this->url);
-		if ($responseText === false) {
-			throw new InfoException('Beanstalk API Request failed', (string) $url);
-		}
-		if ($responseText === "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<releases type=\"array\"/>\n") {
-			return array();
-		}
-		$data = Json::decode($responseText, true);
-		$result = array();
-		foreach ($data as $item) {
-			$result[] = $item[$this->element];
-		}
-		return $result;
 	}
 
 }

@@ -30,21 +30,27 @@ class BeanstalkClient extends Object {
 	private $password;
 
 	/**
+	 * Http connection (keepalive)
+	 * @var cURL
+	 */
+	private $lastRequest;
+
+	/**
 	 * Log the api requests.
 	 * @var Logger
 	 */
-	private $logger;
+	public $logger;
 
 	function __construct($account, $username = null, $password = null) {
 		$this->account = $account;
 		$this->username = $username;
 		$this->password = $password;
 		$this->logger = new Logger(array(
-				'identifier' => 'Beanstalk',
-				'columns' => array('Request', 'Duration'),
-				'plural' => 'requests',
-				'renderer' => array($this, 'renderLog')
-			));
+			'identifier' => 'Beanstalk',
+			'columns' => array('Request', 'Duration'),
+			'plural' => 'requests',
+			'renderer' => array($this, 'renderLog')
+		));
 	}
 
 	/**
@@ -52,7 +58,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getRepositories() {
-		return $this->multiple($this->buildUrl('repositories'), 'repository');
+		return $this->get('repositories');
 	}
 
 	/**
@@ -61,7 +67,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getRepository($id) {
-		return $this->single($this->buildUrl('repositories/'.$id), 'repository');
+		return $this->get('repositories/'.$id);
 	}
 
 	/**
@@ -70,7 +76,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getAccount($id) {
-		return $this->single($this->buildUrl('accounts/'.$id), 'account');
+		return $this->get('accounts/'.$id);
 	}
 
 	/**
@@ -78,7 +84,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getUsers() {
-		return $this->multiple($this->buildUrl('users'), 'user');
+		return $this->get('users');
 	}
 
 	/**
@@ -87,7 +93,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getUser($id) {
-		return $this->single($this->buildUrl('users/'.$id), 'user');
+		return $this->get('users/'.$id);
 	}
 
 	/**
@@ -106,9 +112,9 @@ class BeanstalkClient extends Object {
 	function getChangesets($options = array()) {
 		if (array_value($options, 'all')) {
 			unset($options['all']);
-			return new BeanstalkPagedResult($this->buildUrl('changesets', $options), 'revision_cache');
+			return new BeanstalkPagedResult($this, 'changesets', $options);
 		}
-		return $this->multiple($this->buildUrl('changesets', $options), 'revision_cache');
+		return $this->get('changesets', $options);
 	}
 
 	/**
@@ -128,9 +134,9 @@ class BeanstalkClient extends Object {
 		$options['repository_id'] = $repository;
 		if (array_value($options, 'all')) {
 			unset($options['all']);
-			return new BeanstalkPagedResult($this->buildUrl('changesets/repository', $options), 'revision_cache');
+			return new BeanstalkPagedResult($this, 'changesets/repository', $options);
 		}
-		return $this->multiple($this->buildUrl('changesets/repository', $options), 'revision_cache');
+		return $this->get('changesets/repository', $options);
 	}
 
 	/**
@@ -138,7 +144,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getReleasesFor($repository) {
-		return $this->multiple($this->buildUrl($repository.'/releases'), 'release');
+		return $this->get($repository.'/releases');
 	}
 
 	/**
@@ -146,7 +152,7 @@ class BeanstalkClient extends Object {
 	 * @return array
 	 */
 	function getTagsFor($repository) {
-		return $this->multiple($this->buildUrl('repositories/'.$repository.'/tags'), 'tag');
+		return $this->get('repositories/'.$repository.'/tags');
 	}
 
 	/**
@@ -158,81 +164,67 @@ class BeanstalkClient extends Object {
 	}
 
 	/**
+	 * Perform a GET request to the Beanstalk REST API.
+	 *
+	 * @param string $path Example "repositories/12345"
+	 * @param string $parameters Example array('per_page' => 50)
+	 */
+	function get($path, $parameters = array()) {
+		$url = new URL('https://'.$this->account.'.beanstalkapp.com/api/'.$path.'.json');
+		$url->user = $this->username;
+		$url->pass = $this->password;
+		$url->query = $parameters;
+		$now = microtime(true);
+		$request = new cURL(array(
+			CURLOPT_URL => $url,
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_FAILONERROR => true,
+			CURLOPT_HTTPHEADER, array(
+				'Content-Type: application/json',
+				'Connection: Keep-Alive',
+				'Keep-Alive: 60'
+			),
+			CURLOPT_USERAGENT => 'Sledgehammer BeanstalkClient',
+			CURLOPT_VERBOSE => true
+		));
+		$this->lastRequest = $request; // Keep a reference to the cURL handle (keeps the connection open)
+		$response = $request->getContent();
+		if ($request->getInfo(CURLINFO_CONTENT_TYPE) !== 'application/json; charset=utf-8') {
+			throw new InfoException('Invalid response for "'.$path.'"', array('Response' => $response));
+		}
+		$url->user = null; // don't log username / password
+		$url->pass = null;
+		$this->logger->append((string) $url, array(
+			'parameters' => $parameters,
+			'duration' => microtime(true) - $now
+		));
+		$result = Json::decode($response, true);
+		if (count($result) === 0) {
+			return $result;
+		}
+		$type = key($result);
+		if ($type !== 0) { // single record?
+			return $result[$type];;
+		}
+		// multiple records
+		$records = array();
+		$type = key($result[0]);
+		foreach ($result as $item) {
+			$records[] = $item[$type];
+		}
+		return $records;
+	}
+
+	/**
 	 * Render a log entry.
 	 *
 	 * @param string $url
 	 * @param array $params
 	 */
 	function renderLog($url, $params) {
-		echo '<td><a href="https://', $this->account, '.beanstalkapp.com', $url, '" target="_blank">', HTML::escape($url), '</a></td>';
+		echo '<td><a href="', $url, '" target="_blank">', HTML::escape(substr($url, strpos($url, '/', 10))), '</a></td>';
 		echo '<td>', format_parsetime($params['duration']), ' sec</td>';
 	}
-
-	/**
-	 * Unpack a single element from the json-repsonse.
-	 *
-	 * @param string|URL $url
-	 * @param string $element  The data node
-	 * @return mixed
-	 */
-	private function single($url, $element) {
-		$response = $this->fetchData($url);
-		return $response[$element];
-	}
-
-	/**
-	 * Unpack the elements from the json-repsonse.
-	 *
-	 * @param string|URL $url
-	 * @param string $element  The data node
-	 * @return array
-	 */
-	private function multiple($url, $element) {
-		$response = $this->fetchData($url);
-		$data = array();
-		foreach ($response as $item) {
-			$data[] = $item[$element];
-		}
-		return $data;
-	}
-
-	/**
-	 * Fetch and unpack jsonstring from the Beanstalk api
-	 * @param string|URL $url
-	 * @return mixed
-	 */
-	private function fetchData($url) {
-		$now = microtime(true);
-		$responseText = file_get_contents($url);
-		$this->logger->append(substr($url, strpos($url, '/api/')), array(// Log the request (without the credentials)
-			'duration' => microtime(true) - $now
-		));
-
-		if ($responseText === false) {
-			throw new InfoException('Beanstalk API Request failed', (string) $url);
-		}
-		if ($responseText === "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<releases type=\"array\"/>\n") {
-//			notice('Incorrect response type (xml instead of json)', $url);
-			return array();
-		}
-		return Json::decode($responseText, true);
-	}
-
-	/**
-	 * Build a Beanstalk API url
-	 *
-	 * @param string $path
-	 * @param array $params
-	 * @return \SledgeHammer\URL
-	 */
-	private function buildUrl($path, $params = array()) {
-		$url = new URL('https://'.$this->account.'.beanstalkapp.com/api/'.$path.'.json');
-		$url->user = $this->username;
-		$url->pass = $this->password;
-		$url->query = $params;
-		return $url;
-	}
-
 }
 
 ?>
