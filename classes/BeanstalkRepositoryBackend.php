@@ -15,8 +15,12 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 	 */
 	private $client;
 
-	function __construct($account, $user = null, $password = null) {
-		$this->client = new BeanstalkClient($account, $user, $password);
+	/**
+	 * Constructor
+	 * @param BeanstalkClient $beanstalkClient
+	 */
+	function __construct($beanstalkClient) {
+		$this->client = $beanstalkClient;
 		$this->configs = array(
 			'Repository' => new ModelConfig('Repository', array(
 				'class' => false,
@@ -158,12 +162,37 @@ class BeanstalkRepositoryBackend extends RepositoryBackend {
 	}
 
 	function all($config) {
-		if (in_array($config['type'], array('repository', 'release', 'commit')) === false) {
-			throw new InfoException('Unsupported config', $config);
+		switch ($config['type']) {
+
+			case 'repository':
+				return $this->client->getRepositories();
+
+			case 'commit':
+				return $this->client->getChangesets();
+
+			default:
+				throw new InfoException('Unsupported config', $config);
 		}
-		return new BeanstalkCollection($this->client, $config['type']);
 	}
 
+	function related($relation, $id) {
+		if ($relation['reference'] != 'repository.id') {
+			return parent::related($relation, $id);
+		}
+		$config = $this->configs[$relation['model']]->backendConfig;
+
+		switch ($config['type']) {
+
+			case 'commit':
+				return $this->client->getChangesetsFor($id);
+
+			case 'release':
+				return $this->client->getReleasesFor($id);
+
+			default:
+				throw new InfoException('Unsupported config', $config);
+		}
+	}
 }
 
 ?>

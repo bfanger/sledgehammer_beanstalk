@@ -11,32 +11,81 @@ namespace Sledgehammer;
  */
 class BeanstalkClient extends Object {
 
+	/**
+	 * Account name: $account.beanstalkapp.com
+	 * @var string
+	 */
 	private $account;
-	private $user;
+
+	/**
+	 * Username
+	 * @var string
+	 */
+	private $username;
+
+	/**
+	 * Password
+	 * @var string
+	 */
 	private $password;
 
-	function __construct($account, $user = null, $password = null) {
+	/**
+	 * Log the api requests.
+	 * @var Logger
+	 */
+	private $logger;
+
+	function __construct($account, $username = null, $password = null) {
 		$this->account = $account;
-		$this->user = $user;
+		$this->username = $username;
 		$this->password = $password;
+		$this->logger = new Logger(array(
+				'identifier' => 'Beanstalk',
+				'columns' => array('Request', 'Duration'),
+				'plural' => 'requests',
+				'renderer' => array($this, 'renderLog')
+			));
 	}
 
+	/**
+	 * Fetch all repositories. (in the account the user has access to)
+	 * @return array
+	 */
 	function getRepositories() {
 		return $this->multiple($this->buildUrl('repositories'), 'repository');
 	}
 
+	/**
+	 * Fetch info about a repository.
+	 * @param string|int $id  ID or Repository URL ($account.beanstalkapp.com/$id)
+	 * @return array
+	 */
 	function getRepository($id) {
 		return $this->single($this->buildUrl('repositories/'.$id), 'repository');
 	}
 
+	/**
+	 * Fetch info about the account
+	 * @param int $id
+	 * @return array
+	 */
 	function getAccount($id) {
 		return $this->single($this->buildUrl('accounts/'.$id), 'account');
 	}
 
+	/**
+	 * Fetch all users in the account.
+	 * @return array
+	 */
 	function getUsers() {
 		return $this->multiple($this->buildUrl('users'), 'user');
 	}
 
+	/**
+	 * Fetch info about a user.
+	 * @param int $id
+	 * @return array
+	 */
 	function getUser($id) {
 		return $this->single($this->buildUrl('users/'.$id), 'user');
 	}
@@ -108,22 +157,57 @@ class BeanstalkClient extends Object {
 		return $this->multiple($this->buildUrl('repositories/'.$repository.'/branches'), 'branch');
 	}
 
+	/**
+	 * Render a log entry.
+	 *
+	 * @param string $url
+	 * @param array $params
+	 */
+	function renderLog($url, $params) {
+		echo '<td><a href="https://', $this->account, '.beanstalkapp.com', $url, '" target="_blank">', HTML::escape($url), '</a></td>';
+		echo '<td>', format_parsetime($params['duration']), ' sec</td>';
+	}
+
+	/**
+	 * Unpack a single element from the json-repsonse.
+	 *
+	 * @param string|URL $url
+	 * @param string $element  The data node
+	 * @return mixed
+	 */
 	private function single($url, $element) {
-		$data = $this->fetchData($url);
-		return $data[$element];
+		$response = $this->fetchData($url);
+		return $response[$element];
 	}
 
+	/**
+	 * Unpack the elements from the json-repsonse.
+	 *
+	 * @param string|URL $url
+	 * @param string $element  The data node
+	 * @return array
+	 */
 	private function multiple($url, $element) {
-		$data = $this->fetchData($url);
-		$result = array();
-		foreach ($data as $item) {
-			$result[] = $item[$element];
+		$response = $this->fetchData($url);
+		$data = array();
+		foreach ($response as $item) {
+			$data[] = $item[$element];
 		}
-		return $result;
+		return $data;
 	}
 
+	/**
+	 * Fetch and unpack jsonstring from the Beanstalk api
+	 * @param string|URL $url
+	 * @return mixed
+	 */
 	private function fetchData($url) {
+		$now = microtime(true);
 		$responseText = file_get_contents($url);
+		$this->logger->append(substr($url, strpos($url, '/api/')), array(// Log the request (without the credentials)
+			'duration' => microtime(true) - $now
+		));
+
 		if ($responseText === false) {
 			throw new InfoException('Beanstalk API Request failed', (string) $url);
 		}
@@ -143,7 +227,7 @@ class BeanstalkClient extends Object {
 	 */
 	private function buildUrl($path, $params = array()) {
 		$url = new URL('https://'.$this->account.'.beanstalkapp.com/api/'.$path.'.json');
-		$url->user = $this->user;
+		$url->user = $this->username;
 		$url->pass = $this->password;
 		$url->query = $params;
 		return $url;
