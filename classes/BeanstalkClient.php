@@ -30,12 +30,6 @@ class BeanstalkClient extends Object {
 	private $password;
 
 	/**
-	 * Http connection (keepalive)
-	 * @var cURL
-	 */
-	private $lastRequest;
-
-	/**
 	 * Log the api requests.
 	 * @var Logger
 	 */
@@ -49,6 +43,7 @@ class BeanstalkClient extends Object {
 			'identifier' => 'Beanstalk',
 			'columns' => array('Request', 'Duration'),
 			'plural' => 'requests',
+			'singular' => 'request',
 			'renderer' => array($this, 'renderLog')
 		));
 	}
@@ -187,7 +182,6 @@ class BeanstalkClient extends Object {
 			CURLOPT_USERAGENT => 'Sledgehammer BeanstalkClient',
 			CURLOPT_VERBOSE => true
 		));
-		$this->lastRequest = $request; // Keep a reference to the cURL handle (keeps the connection open)
 		$response = $request->getContent();
 		if ($request->getInfo(CURLINFO_CONTENT_TYPE) !== 'application/json; charset=utf-8') {
 			throw new InfoException('Invalid response for "'.$path.'"', array('Response' => $response));
