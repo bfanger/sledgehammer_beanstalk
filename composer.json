@@ -1,0 +1,11 @@
+{
+	"name": "sledgehammer/beanstalk",
+	"type": "sledgehammer-module",
+	"description": "Beanstalk Client, also exposes the Beanstalk API to the Repository",
+	"require": {
+		"sledgehammer/core": "*"
+	},
+	"suggest": {
+		"sledgehammer/orm": "Use the Beanstalk API via the Repository class"
+	}
+}
